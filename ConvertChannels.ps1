@@ -1,18 +1,21 @@
 ﻿param($fileName)
 
-
 if ([String]::IsNullOrEmpty($fileName))
 {
     throw "Missing file name"
 }
 
-Import-Module DVBChannels
-
-$structure = Test-ChannelStructure -FileName $fileName
-if ($structure -eq "DVBChannels.conf")
+if (-not (Test-Path $fileName))
 {
-    Import-DVBChannelsConf -Filename $fileName | Export-ChannelsConf  
-} else
-{
-    Import-ChannelsConf -Filename $fileName | Export-DVBChannelsConf 
+    throw "File not found"
 }
+
+Remove-Module  DVBChannels -ErrorAction SilentlyContinue
+Import-Module ./DVBChannels -ErrorAction Stop
+
+$channels = Import-Channels -Filename $fileName
+
+$channels | Export-ChannelsConf -FileName "output.channels.conf"
+$channels | Export-DVBChannelsConf  -FileName "output.DVBChannels.conf"
+$channels | Export-VLCM3U  -FileName "output.m3u"
+$channels | Export-VLCXSPF -OutputFileName "output.xspf"

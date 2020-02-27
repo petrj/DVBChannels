@@ -53,6 +53,102 @@ Function New-Channel
     }
 }
 
+
+Function Export-VLCXSPF
+{
+    Param
+    (
+        [parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        $Channel,
+
+        [parameter(Mandatory = $false, ValueFromPipeline = $false)]
+        $OutputFileName
+    )
+    Begin
+    {                	
+        [xml]$Doc = New-Object System.Xml.XmlDocument
+        
+        [System.Xml.XmlNamespaceManager] $nsmgr = $Doc.NameTable        
+        $nsmgr.AddNamespace('vlc','http://www.videolan.org/vlc/playlist/ns/0/')
+
+        $dec = $Doc.CreateXmlDeclaration("1.0","UTF-8",$null)
+        $Doc.AppendChild($dec) | Out-Null
+
+        $root = $Doc.CreateNode("element","playlist",$null)
+        $root.SetAttribute("xmlns","http://xspf.org/ns/0/")
+        $root.SetAttribute("xmlns:vlc","http://www.videolan.org/vlc/playlist/ns/0/")
+        $root.SetAttribute("version","1")
+        $Doc.AppendChild($root) | Out-Null;
+
+        $title = $Doc.CreateNode("element","title",$null)
+        $title.InnerText = "DVBT/DVBT2 channels playlist"
+        $root.AppendChild($title) | Out-Null;
+
+        $creator = $Doc.CreateNode("element","creator",$null)
+        $creator.InnerText="DVBChannels/Export-VLCXSPF"
+        $root.AppendChild($creator) | Out-Null;
+
+        $root.AppendChild($Doc.CreateNode("element","info",$null) ) | Out-Null;
+
+        $trackList = $Doc.CreateNode("element","trackList",$null)
+        $root.AppendChild($trackList) | Out-Null;  
+    }
+    Process
+    {
+        $track = $Doc.CreateNode("element","track",$null)
+        $trackList.AppendChild($track) | Out-Null;
+
+        $title = $Doc.CreateNode("element","title",$null)
+        $title.InnerText = $Channel.Name
+        $track.AppendChild($title) | Out-Null;
+        
+        if ($Channel.DeliverySystem -eq "DVBT2")
+        {
+            $freq = "dvb-t2://"
+        } else
+        {
+            $freq = "dvb-t://"
+        }
+
+        $freq += "frequency=" + $Channel.Frequency
+
+        $location = $Doc.CreateNode("element","location",$null)
+        $location.InnerText = $freq
+        $track.AppendChild($location) | Out-Null;
+
+        $ext = $Doc.CreateNode("element","extension",$null)
+        $ext.SetAttribute("application","http://www.videolan.org/vlc/playlist/0")
+        $track.AppendChild($ext) | Out-Null;
+
+        $bw = $Doc.CreateNode("element","vlc:option",$nsmgr.LookupNamespace("vlc"))
+        $bw.InnerText = "dvb-bandwidth=" + $Channel.Bandwidth/1000000
+        $ext.AppendChild($bw) | Out-Null;
+
+        $tr = $Doc.CreateNode("element","vlc:option",$nsmgr.LookupNamespace("vlc"))
+        $tr.InnerText = "dvb-transmission=" + $Channel.TransmissionMode.Replace("K","")
+        $ext.AppendChild($tr) | Out-Null;
+
+        $guard = $Doc.CreateNode("element","vlc:option",$nsmgr.LookupNamespace("vlc"))
+        $guard.InnerText = "dvb-guard=" + $Channel.GuardInterval
+        $ext.AppendChild($guard) | Out-Null;
+
+        $pr = $Doc.CreateNode("element","vlc:option",$nsmgr.LookupNamespace("vlc"))
+        $pr.InnerText = "program=" + $Channel.ServiceID
+        $ext.AppendChild($pr) | Out-Null;
+    }
+    End
+    {
+        if ([String]::IsNullOrEmpty($OutputFileName))
+        {
+            $Doc.OuterXml
+        } else
+        {
+            $doc.Save($OutputFileName);
+        }
+    }
+}
+
+
 Function Export-ChannelsConf
 {
     Param
@@ -350,8 +446,5 @@ Function Export-VLCM3U
     }
 }
 
-Export-ModuleMember `
-    Test-ChannelStructure, `
-    New-Channel, `
-    Export-ChannelsConf, Export-DVBChannelsConf, Export-VLCM3U, `
-    Import-Channels, Import-DVBChannelsConf, Import-ChannelsConf 
+
+Export-ModuleMember Test-ChannelStructure, New-Channel, Export-ChannelsConf, Export-DVBChannelsConf, Export-VLCM3U, Export-VLCXSPF, Import-Channels, Import-DVBChannelsConf, Import-ChannelsConf 
